@@ -25,7 +25,8 @@ def signup(user_in: UserCreate, session: Session = Depends(get_session)):
         raise HTTPException(status_code=400, detail="Username already exists")
 
     # hash password
-    hashed_password_value = hash_password(user_in.password)
+    password_str = str(user_in.password)[:72]   # ensure string + limit
+    hashed_password_value = hash_password(password_str)
 
     # create new user
     new_user = User(username=user_in.username, hashed_password=hashed_password_value)

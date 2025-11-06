@@ -4,23 +4,46 @@ from typing import Optional, Dict
 from datetime import datetime, timedelta
 
 from jose import jwt, JWTError
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlmodel import Session, select
 
 from backend.models import User
 from backend.database import get_session
 
-# JWT config settings
+
+# ------------------------------
+# JWT CONFIG SETTINGS
+# ------------------------------
 SECRET_KEY = "change_this_secret_for_production"   # change later
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 12
 
-# OAuth2 scheme (FastAPI extracts Bearer token)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+
+# ------------------------------
+# CUSTOM BEARER AUTH (no 'request' in Swagger)
+# ------------------------------
+class JWTBearer(HTTPBearer):
+    def __init__(self, auto_error: bool = True):
+        super(JWTBearer, self).__init__(auto_error=auto_error)
+
+    async def __call__(self, request: Request):
+        credentials: HTTPAuthorizationCredentials = await super(JWTBearer, self).__call__(request)
+        if not credentials or credentials.scheme.lower() != "bearer":
+            raise HTTPException(status_code=403, detail="Invalid or missing token")
+        return credentials.credentials
+
+    # Hide "request" from Swagger (this is key)
+    def __call_dependency__(self, request: Request):
+        return super().__call__(request)
 
 
-# create access token with expiry
+oauth2_scheme = JWTBearer()
+
+
+# ------------------------------
+# TOKEN CREATION
+# ------------------------------
 def create_access_token(data: Dict) -> str:
     expire = datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
     to_encode = data.copy()
@@ -28,14 +51,21 @@ def create_access_token(data: Dict) -> str:
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-# helper to fetch user by username
+# ------------------------------
+# FETCH USER BY USERNAME
+# ------------------------------
 def get_user_by_username(session: Session, username: str) -> Optional[User]:
     statement = select(User).where(User.username == username)
     return session.exec(statement).first()
 
 
-# dependency: decode token -> return current user
-def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Depends(get_session)) -> User:
+# ------------------------------
+# GET CURRENT USER FROM TOKEN
+# ------------------------------
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    session: Session = Depends(get_session)
+) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or expired token",
@@ -43,7 +73,6 @@ def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Dep
     )
 
     try:
-        # decode token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
@@ -51,7 +80,6 @@ def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Dep
     except JWTError:
         raise credentials_exception
 
-    # get user record from DB
     user = get_user_by_username(session, username)
     if user is None:
         raise credentials_exception
