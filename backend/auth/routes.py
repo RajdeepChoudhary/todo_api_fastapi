@@ -9,9 +9,12 @@ from backend.database import get_session
 from backend.auth.hashing import hash_password, verify_password
 from backend.auth.jwt_handler import create_access_token, get_user_by_username
 
+from backend.auth.jwt_handler import get_current_user
+from backend.models import User
+
+
 # router for auth endpoints
 router = APIRouter(prefix="/auth", tags=["Auth"])
-
 
 # ------------------------------
 # SIGNUP ROUTE(create new user)
@@ -59,3 +62,14 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
     token = create_access_token({"sub": user.username})
 
     return {"access_token": token, "token_type": "bearer"}
+
+# ----------------------------
+# WHOAMI ROUTE (get current user info)
+# ----------------------------
+@router.get("/whoami")
+def who_am_i(current_user: User = Depends(get_current_user)):
+    """Return info about the currently logged-in user."""
+    return {
+        "username": current_user.username,
+        "created_at": current_user.created_at
+    }
