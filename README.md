@@ -18,6 +18,7 @@ A simple and fully functional **Todo API** built with **FastAPI**, featuring **J
 ## Project Structure
 
 
+```
 todo_project/
 │
 ├── backend/
@@ -25,13 +26,13 @@ todo_project/
 │   ├── main.py
 │   ├── database.py
 │   ├── models.py
-│   │
+│
 │   ├── auth/
 │   │   ├── __init__.py
 │   │   ├── routes.py
 │   │   ├── hashing.py
 │   │   └── jwt_handler.py
-│   │
+│
 │   ├── todo/
 │   │   ├── __init__.py
 │   │   └── routes.py
@@ -42,6 +43,7 @@ todo_project/
 ├── README.md
 ├── database.db
 └── token.txt
+```
 
 
 ---
